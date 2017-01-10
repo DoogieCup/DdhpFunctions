@@ -1,0 +1,26 @@
+﻿{
+  "disabled": false,
+  "bindings": [
+    {
+      "name": "myQueueItem",
+      "type": "queueTrigger",
+      "direction": "in",
+      "queueName": "clubreadupdater",
+      "connection": "AzureWebJobsDashboard"
+    },
+    {
+      "name": "clubEvents",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "clubEvents",
+      "direction": "in"
+    },
+    {
+      "name": "clubWriter",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "clubsRead",
+      "direction": "out"
+    }
+  ]
+}
