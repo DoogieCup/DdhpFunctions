@@ -29,7 +29,7 @@ public async static Task Run(string myQueueItem, IQueryable<DdhpEvent> clubEvent
     {
         var clubSeason = new ClubSeason(year, entity);
 
-        var upsert = TableOperation.InsertOrReplace(entity);
+        var upsert = TableOperation.InsertOrReplace(clubSeason);
         tasks.Add(clubWriter.ExecuteAsync(upsert));
     }
 
