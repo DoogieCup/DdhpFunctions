@@ -1,12 +1,19 @@
 ﻿#r "Newtonsoft.Json"
 #r "Microsoft.WindowsAzure.Storage"
 using System;
+using System.Diagnostics.Contracts;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
+using System.Runtime.Remoting.Metadata.W3cXsd2001;
 
-public async static Task Run(string myQueueItem, IQueryable<DdhpEvent> clubEvents, CloudTable clubWriter, TraceWriter log)
+public async static Task Run(string myQueueItem, 
+    IQueryable<DdhpEvent> clubEvents, 
+    IQueryable<Player> players,
+    CloudTable clubWriter, 
+    TraceWriter log)
 {
     _log = log;
 
@@ -17,6 +24,21 @@ public async static Task Run(string myQueueItem, IQueryable<DdhpEvent> clubEvent
 
     var entity = Club.LoadFromEvents(clubEvents.Where(q => q.PartitionKey == id.ToString()));
     log.Info($"Club Name: {entity.ClubName} Id: {entity.Id}");
+
+    var contracts = entity._contracts;
+
+    foreach (var contract in contracts)
+    {
+        var player = players.Where(q => q.Id == contract.PlayerId).ToList();
+
+        if (!player.Any())
+        {
+            log.Info($"Cannot find player for id {contract.PlayerId}");
+            continue;
+        }
+
+        contract.SetPlayer(player.Single());
+    }
 
     var years = entity.ContractsRead.Select(q => q.FromRound / 100).ToList();
     years.AddRange(entity.ContractsRead.Select(q => q.ToRound / 100));
@@ -80,7 +102,7 @@ public class ClubSeason : TableEntity
         }
     }
 
-    private List<Contract> _contracts = new List<Contract>();
+    public List<Contract> _contracts = new List<Contract>();
 
     public string Contracts
     {
@@ -108,7 +130,7 @@ public class Club : TableEntity
     public string ClubName { get; set; }
     public string Email { get; set; }
 
-    private List<Contract> _contracts = new List<Contract>();
+    public List<Contract> _contracts = new List<Contract>();
 
     public IEnumerable<Contract> ContractsRead => _contracts;
 
@@ -202,6 +224,12 @@ public class Contract
     public int FromRound { get; set; }
     public int ToRound { get; set; }
     public int DraftPick { get; set; }
+    public string Player { get; set; }
+
+    public void SetPlayer(Player player)
+    {
+        Player = JsonConvert.SerializeObject(player);
+    }
 }
 
 public class DdhpEvent : TableEntity
@@ -249,4 +277,30 @@ public class ContractImportedEvent
     public int FromRound { get; set; }
     public int ToRound { get; set; }
     public int DraftPick { get; set; }
+}
+
+public class Player : TableEntity
+{
+    private Guid _id;
+
+    public Guid Id
+    {
+        get { return _id; }
+        set
+        {
+            RowKey = value.ToString();
+            PartitionKey = value.ToString().Substring(0, 1);
+            _id = value;
+        }
+    }
+
+    public string Name { get; set; }
+
+    public Guid CurrentAflClubId { get; set; }
+
+    public bool Active { get; set; }
+    public string FootywireName { get; set; }
+
+    [IgnoreProperty]
+    public int LegacyId { get; set; }
 }

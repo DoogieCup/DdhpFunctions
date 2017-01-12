@@ -16,6 +16,13 @@
       "direction": "in"
     },
     {
+      "name": "players",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "players",
+      "direction": "in"
+    },
+    {
       "name": "clubWriter",
       "type": "table",
       "connection": "AzureWebJobsDashboard",
