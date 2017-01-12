@@ -6,7 +6,7 @@ using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using System.Linq;
 
-public static void Run(string myQueueItem, IQueryable<DdhpEvent> clubEvents, ICollector<ClubSeason> clubWriter, TraceWriter log)
+public async static Task Run(string myQueueItem, IQueryable<DdhpEvent> clubEvents, CloudTable clubWriter, TraceWriter log)
 {
     _log = log;
 
@@ -23,11 +23,17 @@ public static void Run(string myQueueItem, IQueryable<DdhpEvent> clubEvents, ICo
 
     var distinctYears = years.Distinct();
 
+    var tasks = new List<Task>(distinctYears.Count());
+
     foreach (var year in distinctYears)
     {
         var clubSeason = new ClubSeason(year, entity);
-        clubWriter.Add(clubSeason);
+
+        var upsert = TableOperation.InsertOrReplace(clubSeason);
+        tasks.Add(clubWriter.ExecuteAsync(upsert));
     }
+
+    await Task.WhenAll(tasks);
 }
 
 private static TraceWriter _log;
