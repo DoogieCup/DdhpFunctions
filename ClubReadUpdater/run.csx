@@ -52,19 +52,21 @@ public class ClubSeason : TableEntity
         _contracts = club.ContractsRead.Where(q => q.FromRound <= int.Parse($"{year}24") && q.ToRound >= int.Parse($"{year}01")).ToList();
     }
 
-    private Guid _id;
-    public Guid Id
+    private string _clubName{get;set;}
+    public Guid Id{get;set;}
+
+    public string CoachName { get; set; }
+    public string ClubName
     {
-        get { return _id; }
-        set
+        get
         {
-            _id = value;
+            return _clubName;
+        }
+        set{
+            _clubName = value;
             RowKey = value.ToString();
         }
     }
-
-    public string CoachName { get; set; }
-    public string ClubName { get; set; }
     public string Email { get; set; }
     public int Year
     {
