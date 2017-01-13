@@ -1,0 +1,24 @@
+﻿{
+  "disabled": false,
+  "bindings": [
+    {
+      "type": "manualTrigger",
+      "direction": "in",
+      "name": "input"
+    },
+    {
+      "name": "rounds",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "rounds",
+      "direction": "in"
+    },
+    {
+      "name": "seasonWriter",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "SeasonEvents",
+      "direction": "out"
+    }
+  ]
+}
