@@ -9,21 +9,65 @@ using Newtonsoft.Json;
 public async static Task Run(string input,
     IQueryable<Round> rounds,
     TraceWriter log,
-    IAsyncCollector<Season> seasonWriter)
+    IAsyncCollector<Event> seasonWriter)
 {
-    int beginning = 2008;
-    IEnumerable<Round> currentRounds = Enumerable.Empty<Round>();
+    log.Info("Starting run");
+
+    int year = 2008;
+    List<Round> currentRounds = rounds.Where(round => round.Year == year).ToList();
 
     do
     {
+        log.Info($"{year} Found {currentRounds.Count} rounds");
 
+        int version = 0;
+
+        var creation = new SeasonCreatedEvent
+        {
+        };
+
+        var creationEvent = new Event(year,
+            version++,
+            "seasonCreated",
+            creation
+            );
+
+        await seasonWriter.AddAsync(creationEvent);
+
+        year++;
+        currentRounds = rounds.Where(round => round.Year == year).ToList();
     }
     while (currentRounds.Any());
 }
 
-public class Season
+public class Event : TableEntity
 {
+    public Event(int entityId,
+        int entityVersion,
+        string eventType,
+        object payload)
+    {
+        RowKey = entityVersion.ToString("0000000000");
+        PartitionKey = entityId.ToString();
+        EventType = eventType;
+        SetPayload(payload);
+    }
 
+    public string EventType{get;set;}
+    public string Payload{get;set;}
+    public T GetPayload<T>()
+    {
+        return (T)JsonConvert.DeserializeObject<T>(Payload);
+    }
+
+    public void SetPayload(object payload)
+    {
+        Payload = JsonConvert.SerializeObject(payload);
+    }
+}
+
+public class SeasonCreatedEvent
+{
 }
 
 public class Round : TableEntity
