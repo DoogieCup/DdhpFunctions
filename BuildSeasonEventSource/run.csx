@@ -26,6 +26,10 @@ public async static Task Run(string input,
         int version = 0;
 
         await CreateSeason(year, version++);
+        foreach (var round in currentRounds)
+        {
+            await AddRound(year, round.RoundNumber, version++);
+        }
 
         year++;
         currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
@@ -33,10 +37,22 @@ public async static Task Run(string input,
     while (currentRounds.Any());
 }
 
+private static async Task AddRound(int year, int round, int version)
+{
+    var addition = new RoundAddedEvent{Round = round};
+    var additionEvent = new Event(year, 
+        version, 
+        "roundAdded",
+        addition);
+
+    await _seasonWriter.AddAsync(additionEvent);
+}
+
 private static async Task CreateSeason(int year, int version)
 {
     var creation = new SeasonCreatedEvent
     {
+        Id = year
     };
 
     var creationEvent = new Event(year,
@@ -74,8 +90,14 @@ public class Event : TableEntity
     }
 }
 
+public class RoundAddedEvent
+{
+    public int Round{get;set;}
+}
+
 public class SeasonCreatedEvent
 {
+    public int Id{get;set;}
 }
 
 public class Round : TableEntity
