@@ -6,38 +6,46 @@ using Microsoft.WindowsAzure.Storage.Table;
 using System.Linq;
 using Newtonsoft.Json;
 
+private static IAsyncCollector<Event> _seasonWriter;
+
 public async static Task Run(string input,
     IQueryable<Round> rounds,
     TraceWriter log,
     IAsyncCollector<Event> seasonWriter)
 {
     log.Info("Starting run");
+    _seasonWriter = seasonWriter;
 
     int year = 2008;
-    List<Round> currentRounds = rounds.Where(round => round.Year == year).ToList();
+    var currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
 
     do
     {
-        log.Info($"{year} Found {currentRounds.Count} rounds");
+        log.Info($"{year} Found {currentRounds.Count()} rounds");
 
         int version = 0;
 
-        var creation = new SeasonCreatedEvent
-        {
-        };
-
-        var creationEvent = new Event(year,
-            version++,
-            "seasonCreated",
-            creation
-            );
-
-        await seasonWriter.AddAsync(creationEvent);
+        await CreateSeason(year, version++);
 
         year++;
-        currentRounds = rounds.Where(round => round.Year == year).ToList();
+        currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
     }
     while (currentRounds.Any());
+}
+
+private static async Task CreateSeason(int year, int version)
+{
+    var creation = new SeasonCreatedEvent
+    {
+    };
+
+    var creationEvent = new Event(year,
+        version,
+        "seasonCreated",
+        creation
+        );
+
+    await _seasonWriter.AddAsync(creationEvent);
 }
 
 public class Event : TableEntity
