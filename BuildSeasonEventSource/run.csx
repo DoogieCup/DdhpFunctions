@@ -7,14 +7,17 @@ using System.Linq;
 using Newtonsoft.Json;
 
 private static IAsyncCollector<Event> _seasonWriter;
+private static IQueryable<Fixture> _fixtures;
 
 public async static Task Run(string input,
     IQueryable<Round> rounds,
+    IQueryable<Fixture> fixtures,
     TraceWriter log,
     IAsyncCollector<Event> seasonWriter)
 {
     log.Info("Starting run");
     _seasonWriter = seasonWriter;
+    _fixtures = fixtures;
 
     int year = 2008;
     var currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
@@ -35,6 +38,24 @@ public async static Task Run(string input,
         currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
     }
     while (currentRounds.Any());
+}
+
+public static async Task<int> AddFixture(int year, Fixture fixture, int version)
+{
+    var addition = new FixtureAddedEvent
+    {
+        HomeClub = fixture.Home,
+        AwayClub = fixture.Away
+    };
+
+    var addEvent = new Event(year,
+        version++,
+        "fixtureAdded",
+        addition);
+
+    await _seasonWriter.AddAsync(addEvent);
+
+    return version;
 }
 
 private static async Task<int> AddRound(int year, Round round, int version)
@@ -58,6 +79,11 @@ private static async Task<int> AddRound(int year, Round round, int version)
             new object());
 
         await _seasonWriter.AddAsync(completeEvent);
+    }
+
+    foreach (var fixture in _fixtures.Where(fixture =>fixture.PartitionKey == $"{round.Id}"))
+    {
+        version = await AddFixture(year, fixture, version);
     }
 
     return version;
@@ -103,6 +129,12 @@ public class Event : TableEntity
     {
         Payload = JsonConvert.SerializeObject(payload);
     }
+}
+
+public class FixtureAddedEvent
+{
+    public Guid HomeClub{get;set;}
+    public Guid AwayClub{get;set;}
 }
 
 public class RoundAddedEvent
