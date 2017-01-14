@@ -39,7 +39,10 @@ public async static Task Run(string input,
 
 private static async Task<int> AddRound(int year, Round round, int version)
 {
-    var addition = new RoundAddedEvent{Round = round.RoundNumber};
+    var addition = new RoundAddedEvent{
+        Round = round.RoundNumber,
+        NormalRound = round.NormalRound
+    };
     var additionEvent = new Event(year, 
         version++, 
         "roundAdded",
@@ -105,6 +108,7 @@ public class Event : TableEntity
 public class RoundAddedEvent
 {
     public int Round{get;set;}
+    public bool NormalRound{get;set;}
 }
 
 public class SeasonCreatedEvent
