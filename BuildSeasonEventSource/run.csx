@@ -28,7 +28,7 @@ public async static Task Run(string input,
         await CreateSeason(year, version++);
         foreach (var round in currentRounds)
         {
-            await AddRound(year, round.RoundNumber, version++);
+            version = await AddRound(year, round, version);
         }
 
         year++;
@@ -37,15 +37,27 @@ public async static Task Run(string input,
     while (currentRounds.Any());
 }
 
-private static async Task AddRound(int year, int round, int version)
+private static async Task<int> AddRound(int year, Round round, int version)
 {
-    var addition = new RoundAddedEvent{Round = round};
+    var addition = new RoundAddedEvent{Round = round.RoundNumber};
     var additionEvent = new Event(year, 
-        version, 
+        version++, 
         "roundAdded",
         addition);
 
     await _seasonWriter.AddAsync(additionEvent);
+
+    if (round.RoundComplete)
+    {
+        var completeEvent = new Event(year,
+            version++,
+            "roundCompleted",
+            new object());
+
+        await _seasonWriter.AddAsync(completeEvent);
+    }
+
+    return version;
 }
 
 private static async Task CreateSeason(int year, int version)
