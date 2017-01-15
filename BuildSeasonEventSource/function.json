@@ -1,0 +1,52 @@
+﻿{
+  "disabled": false,
+  "bindings": [
+    {
+      "name": "input",
+      "type": "manualTrigger",
+      "direction": "in"
+    },
+    {
+      "name": "rounds",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "rounds",
+      "direction": "in"
+    },
+    {
+      "name": "fixtures",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "fixtures",
+      "direction": "in"
+    },
+    {
+      "name": "pickedTeams",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "pickedTeams",
+      "direction": "in"
+    },
+    {
+      "name": "stats",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "stats",
+      "direction": "in"
+    },
+    {
+      "name": "aflClubs",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "aflclubs",
+      "direction": "in"
+    },
+    {
+      "name": "seasonWriter",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "SeasonEvents",
+      "direction": "out"
+    }
+  ]
+}
