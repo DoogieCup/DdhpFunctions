@@ -9,12 +9,16 @@ using Newtonsoft.Json;
 private static IAsyncCollector<Event> _seasonWriter;
 private static IQueryable<Fixture> _fixtures;
 private static IQueryable<PickedTeam> _pickedTeams;
+private static IQueryable<StorageStat> _stats;
+private static IQueryable<AflClub> _aflClubs;
 private static TraceWriter _logger;
 
 public async static Task Run(string input,
     IQueryable<Round> rounds,
     IQueryable<Fixture> fixtures,
     IQueryable<PickedTeam> pickedTeams,
+    IQueryable<StorageStat> stats,
+    IQueryable<AflClub> aflClubs,
     TraceWriter log,
     IAsyncCollector<Event> seasonWriter)
 {
@@ -23,9 +27,13 @@ public async static Task Run(string input,
     _seasonWriter = seasonWriter;
     _fixtures = fixtures;
     _pickedTeams = pickedTeams;
+    _stats = stats;
+    _aflClubs = aflClubs;
 
     int year = 2008;
     var currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
+
+    var aflClubIds = aflClubs.Select(q => q.Id);
 
     do
     {
@@ -37,6 +45,8 @@ public async static Task Run(string input,
         foreach (var round in currentRounds)
         {
             version = await AddRound(year, round, version);
+
+            version = await ImportStats(round, version);
         }
 
         year++;
@@ -45,7 +55,35 @@ public async static Task Run(string input,
     while (currentRounds.Any());
 }
 
-private async Task SaveEvent(Event e)
+private static async Task<int> ImportStats(Round round, int version)
+{
+    _logger.Info($"Processing stats for {round.Id}");
+
+    var stats = _stats.Where(q => q.PartitionKey == round.Id.ToString()).ToList().GroupBy(q => q.AflClubId);
+
+    _logger.Info($"Found {stats.Count()} stats");
+
+    foreach (var statGroup in stats)
+    {
+        var matchStats = new StatsSubmittedEvent
+        {
+            RoundNumber = round.RoundNumber,
+            AflClubId = statGroup.Key,
+            Stats = statGroup.Select(q => (Stat)q)
+        };
+
+        var statEvent = new Event(round.Year,
+            version++,
+            "statsImported",
+            matchStats);
+
+        await SaveEvent(statEvent);
+    }
+
+    return version;
+}
+
+private static async Task SaveEvent(Event e)
 {
     try
     {
@@ -74,7 +112,7 @@ public static async Task<int> AddFixture(Round round, Fixture fixture, int versi
         "fixtureAdded",
         addition);
 
-    await _seasonWriter.AddAsync(addEvent);
+    await SaveEvent(addEvent);
 
     PickedTeam[] pickedTeams = _pickedTeams.Where(q =>q.PartitionKey == fixture.RoundId.ToString()).ToList().Where(q => q.ClubId == fixture.Home || q.ClubId == fixture.Away).ToArray();
 
@@ -109,7 +147,7 @@ private static async Task<int> AddTeam(Round round, int version, PickedTeam team
         "teamSubmitted",
         teamEvent);
 
-    await _seasonWriter.AddAsync(pickedEvent);
+    await SaveEvent(pickedEvent);
 
     return version;
 }
@@ -125,7 +163,7 @@ private static async Task<int> AddRound(int year, Round round, int version)
         "roundAdded",
         addition);
 
-    await _seasonWriter.AddAsync(additionEvent);
+    await SaveEvent(additionEvent);
 
     if (round.RoundComplete)
     {
@@ -134,7 +172,7 @@ private static async Task<int> AddRound(int year, Round round, int version)
             "roundCompleted",
             new object());
 
-        await _seasonWriter.AddAsync(completeEvent);
+        await SaveEvent(completeEvent);
     }
 
     foreach (var fixture in _fixtures.Where(fixture =>fixture.PartitionKey == $"{round.Id}"))
@@ -158,7 +196,7 @@ private static async Task CreateSeason(int year, int version)
         creation
         );
 
-    await _seasonWriter.AddAsync(creationEvent);
+    await SaveEvent(creationEvent);
 }
 
 public class Event : TableEntity
@@ -195,6 +233,13 @@ private static int GetRoundNumber(int roundId)
     }
         
     return int.Parse(roundId.ToString().Substring(4, 2));
+}
+
+public class StatsSubmittedEvent
+{
+    public int RoundNumber{get;set;}
+    public Guid AflClubId{get;set;}
+    public IEnumerable<Stat> Stats{get;set;}
 }
 
 public class PickedTeamSubmittedEvent
@@ -251,48 +296,6 @@ public class Round : TableEntity
 
     public bool RoundComplete { get; set; }
     public bool NormalRound { get; set; }
-}
-
-public class Stat : TableEntity
-{
-    private Guid _playerId;
-    private int _round;
-
-    public Guid PlayerId
-    {
-        get { return _playerId; }
-        set
-        {
-            RowKey = value.ToString();
-            _playerId = value;
-        }
-    }
-
-    public int Round
-    {
-        get { return _round; }
-        set
-        {
-            PartitionKey = value.ToString();
-            _round = value;
-        }
-    }
-
-    public int Goals { get; set; }
-    public int Behinds { get; set; }
-    public int Disposals { get; set; }
-    public int Marks { get; set; }
-    public int Hitouts { get; set; }
-    public int Tackles { get; set; }
-    public int Kicks { get; set; }
-    public int Handballs { get; set; }
-    public int GoalAssists { get; set; }
-    // ReSharper disable once InconsistentNaming
-    public int Inside50s { get; set; }
-    public int FreesFor { get; set; }
-    public int FreesAgainst { get; set; }
-    // ReSharper disable once InconsistentNaming
-    public Guid AflClubId { get; set; }
 }
 
 public class Fixture : TableEntity
@@ -403,4 +406,103 @@ public class Player : TableEntity
 
     [IgnoreProperty]
     public int LegacyId { get; set; }
+}
+
+public class AflClub : TableEntity
+{
+    private Guid _id;
+
+    public AflClub()
+    {
+        PartitionKey = "AFL_CLUB";
+    }
+
+    public Guid Id
+    {
+        get { return _id; }
+        set
+        {
+            RowKey = value.ToString();
+            _id = value;
+        }
+    }
+
+    public string Name { get; set; }
+    public string ShortName { get; set; }
+}
+
+public class StorageStat : TableEntity
+    {
+        private Guid _playerId;
+        private int _round;
+
+        public Guid PlayerId
+        {
+            get { return _playerId; }
+            set
+            {
+                RowKey = value.ToString();
+                _playerId = value;
+            }
+        }
+
+        public int Round
+        {
+            get { return _round; }
+            set
+            {
+                PartitionKey = value.ToString();
+                _round = value;
+            }
+        }
+
+        public int Goals { get; set; }
+        public int Behinds { get; set; }
+        public int Disposals { get; set; }
+        public int Marks { get; set; }
+        public int Hitouts { get; set; }
+        public int Tackles { get; set; }
+        public int Kicks { get; set; }
+        public int Handballs { get; set; }
+        public int GoalAssists { get; set; }
+        // ReSharper disable once InconsistentNaming
+        public int Inside50s { get; set; }
+        public int FreesFor { get; set; }
+        public int FreesAgainst { get; set; }
+        // ReSharper disable once InconsistentNaming
+        public Guid AflClubId { get; set; }
+    }
+
+public struct Stat
+{
+    public Guid PlayerId{get;set;}
+    public int Goals { get; set; }
+    public int Behinds { get; set; }
+    public int Disposals { get; set; }
+    public int Marks { get; set; }
+    public int Hitouts { get; set; }
+    public int Tackles { get; set; }
+    public int Kicks { get; set; }
+    public int Handballs { get; set; }
+    public int GoalAssists { get; set; }
+    public int Inside50s { get; set; }
+    public int FreesFor { get; set; }
+    public int FreesAgainst { get; set; }
+    public Guid AflClubId { get; set; }
+
+    public static implicit operator Stat(string stat)
+    {
+        return JsonConvert.DeserializeObject<Stat>(stat);
+    }
+
+    public static implicit operator Stat(StorageStat stat)
+    {
+        var json = JsonConvert.SerializeObject(stat);
+        return JsonConvert.DeserializeObject<Stat>(json);
+    }
+
+    public override string ToString()
+    {
+        return JsonConvert.SerializeObject(this);
+    }
 }

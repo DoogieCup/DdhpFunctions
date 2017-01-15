@@ -28,6 +28,20 @@
       "direction": "in"
     },
     {
+      "name": "stats",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "stats",
+      "direction": "in"
+    },
+    {
+      "name": "aflClubs",
+      "type": "table",
+      "connection": "AzureWebJobsDashboard",
+      "tableName": "aflclubs",
+      "direction": "in"
+    },
+    {
       "name": "seasonWriter",
       "type": "table",
       "connection": "AzureWebJobsDashboard",
