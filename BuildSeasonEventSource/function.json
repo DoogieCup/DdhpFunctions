@@ -2,11 +2,9 @@
   "disabled": false,
   "bindings": [
     {
-      "name":"input",
-       "type": "queueTrigger",
-      "direction": "in",
-      "queueName": "notused",
-      "connection": "AzureWebJobsDashboard"
+      "name": "input",
+      "type": "manualTrigger",
+      "direction": "in"
     },
     {
       "name": "rounds",

@@ -81,6 +81,12 @@ public static async Task<int> AddFixture(Round round, Fixture fixture, int versi
     if (pickedTeams.Length != 2)
     {
         _logger.Info($"Got an unexpected number of teams in fixture {fixture.PartitionKey} {fixture.RowKey}: {pickedTeams.Length}");
+
+        // We've got some bad data for a couple of rounds. It's ok to bail on these during import.
+        if (round.Year == 2010 && (new[]{19, 22}).Contains(round.RoundNumber))
+        {
+            return version;
+        }
     }
 
     version = await AddTeam(round, version, pickedTeams[0]);
