@@ -8,16 +8,21 @@ using Newtonsoft.Json;
 
 private static IAsyncCollector<Event> _seasonWriter;
 private static IQueryable<Fixture> _fixtures;
+private static IQueryable<PickedTeam> _pickedTeams;
+private static TraceWriter _logger;
 
 public async static Task Run(string input,
     IQueryable<Round> rounds,
     IQueryable<Fixture> fixtures,
+    IQueryable<PickedTeam> pickedTeams,
     TraceWriter log,
     IAsyncCollector<Event> seasonWriter)
 {
     log.Info("Starting run");
+    _logger = log;
     _seasonWriter = seasonWriter;
     _fixtures = fixtures;
+    _pickedTeams = pickedTeams;
 
     int year = 2008;
     var currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
@@ -40,13 +45,29 @@ public async static Task Run(string input,
     while (currentRounds.Any());
 }
 
-public static async Task<int> AddFixture(int year, Fixture fixture, int version)
+private async Task SaveEvent(Event e)
+{
+    try
+    {
+        await _seasonWriter.AddAsync(e);
+    }
+    catch (Exception ex)
+    {
+        _logger.Info($"Error while saving event {e.PartitionKey} {e.RowKey}\n{e.Payload}\n{ex.ToString()}");
+        throw;
+    }
+}
+
+public static async Task<int> AddFixture(Round round, Fixture fixture, int version)
 {
     var addition = new FixtureAddedEvent
     {
+        RoundNumber = GetRoundNumber(fixture.RoundId),
         HomeClub = fixture.Home,
         AwayClub = fixture.Away
     };
+
+    var year = round.Year;
 
     var addEvent = new Event(year,
         version++,
@@ -54,6 +75,35 @@ public static async Task<int> AddFixture(int year, Fixture fixture, int version)
         addition);
 
     await _seasonWriter.AddAsync(addEvent);
+
+    PickedTeam[] pickedTeams = _pickedTeams.Where(q =>q.PartitionKey == fixture.RoundId.ToString()).ToList().Where(q => q.ClubId == fixture.Home || q.ClubId == fixture.Away).ToArray();
+
+    if (pickedTeams.Length != 2)
+    {
+        _logger.Info($"Got an unexpected number of teams in fixture {fixture.PartitionKey} {fixture.RowKey}: {pickedTeams.Length}");
+    }
+
+    version = await AddTeam(round, version, pickedTeams[0]);
+    version = await AddTeam(round, version, pickedTeams[1]);
+
+    return version;
+}
+
+private static async Task<int> AddTeam(Round round, int version, PickedTeam team)
+{
+    var teamEvent = new PickedTeamSubmittedEvent
+    {
+        RoundNumber = round.RoundNumber,
+        ClubId = team.ClubId,
+        Team = team
+    };
+
+    var pickedEvent = new Event(round.Year,
+        version++,
+        "teamSubmitted",
+        teamEvent);
+
+    await _seasonWriter.AddAsync(pickedEvent);
 
     return version;
 }
@@ -83,7 +133,7 @@ private static async Task<int> AddRound(int year, Round round, int version)
 
     foreach (var fixture in _fixtures.Where(fixture =>fixture.PartitionKey == $"{round.Id}"))
     {
-        version = await AddFixture(year, fixture, version);
+        version = await AddFixture(round, fixture, version);
     }
 
     return version;
@@ -131,8 +181,26 @@ public class Event : TableEntity
     }
 }
 
+private static int GetRoundNumber(int roundId)
+{
+    if (roundId.ToString().Length != 6)
+    {
+        _logger.Info($"Unexpected length of roundId {roundId}");
+    }
+        
+    return int.Parse(roundId.ToString().Substring(4, 2));
+}
+
+public class PickedTeamSubmittedEvent
+{
+    public int RoundNumber{get;set;}
+    public Guid ClubId{get;set;}
+    public PickedTeam Team{get;set;}
+}
+
 public class FixtureAddedEvent
 {
+    public int RoundNumber{get;set;}
     public Guid HomeClub{get;set;}
     public Guid AwayClub{get;set;}
 }
@@ -242,8 +310,8 @@ public class Fixture : TableEntity
         get { return _home; }
         set
         {
-            SetRowKey();
             _home = value;
+            SetRowKey();
         }
     }
 
@@ -252,8 +320,8 @@ public class Fixture : TableEntity
         get { return _away; }
         set
         {
-            SetRowKey();
             _away = value;
+            SetRowKey();
         }
     }
 
@@ -263,7 +331,7 @@ public class Fixture : TableEntity
     }
 }
 
-public class PlayedTeam : TableEntity
+public class PickedTeam : TableEntity
 {
     private Guid _clubId;
     private int _round;
@@ -292,21 +360,16 @@ public class PlayedTeam : TableEntity
     public string TeamJson
     {
         get { return JsonConvert.SerializeObject(Team); }
-        set { Team = (IEnumerable<PlayedTeam.TeamPlayer>)JsonConvert.DeserializeObject<IEnumerable<PlayedTeam.TeamPlayer>>(value); }
+        set { Team = (IEnumerable<TeamPlayer>) JsonConvert.DeserializeObject<IEnumerable<TeamPlayer>>(value); }
     }
 
-    public int Score { get; set; }
-
     [IgnoreProperty]
-    public IEnumerable<PlayedTeam.TeamPlayer> Team { get; set; }
+    public IEnumerable<TeamPlayer> Team { get; set; }
 
     public class TeamPlayer
     {
         public Guid PlayerId { get; set; }
         public char PickedPosition { get; set; }
-        public char PlayedPosition { get; set; }
-        public Stat Stat { get; set; }
-        public int Score { get; set; }
     }
 }
 
