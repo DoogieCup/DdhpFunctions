@@ -170,7 +170,7 @@ private static async Task<int> AddRound(int year, Round round, int version)
         var completeEvent = new Event(year,
             version++,
             "roundCompleted",
-            new object());
+            new RoundCompletedEvent{RoundNumber = round.RoundNumber});
 
         await SaveEvent(completeEvent);
     }
@@ -247,6 +247,11 @@ public class PickedTeamSubmittedEvent
     public int RoundNumber{get;set;}
     public Guid ClubId{get;set;}
     public PickedTeam Team{get;set;}
+}
+
+public class RoundCompletedEvent
+{
+    public int RoundNumber{get;set;}
 }
 
 public class FixtureAddedEvent
