@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Diagnostics;
+using System.IO.IsolatedStorage;
 using System.Reflection;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
@@ -11,17 +13,21 @@ using System.Linq;
 using System.Runtime.Remoting.Messaging;
 using System.Runtime.Remoting.Metadata.W3cXsd2001;
 
-public async static Task Run(string myQueueItem, 
+public async static
+
+Task Run(string myQueueItem, 
     IQueryable<DdhpEvent> clubEvents, 
     IQueryable<Player> players,
+    IQueryable<StorageStat> stats,
     CloudTable clubWriter, 
     TraceWriter log)
 {
-    _log = log;
+    _log =log;
 
     Guid id = Guid.Parse(myQueueItem);
 
     var events = clubEvents.Where(q => q.PartitionKey == id.ToString()).ToList();
+    if (!events.Any()) { throw new Exception("I haven't any events!"); }
     log.Info($"Club events count: {events.Count}");
 
     var entity = Club.LoadFromEvents(clubEvents.Where(q => q.PartitionKey == id.ToString()));
@@ -36,8 +42,6 @@ public async static Task Run(string myQueueItem,
             log.Info($"Cannot find player for id {contract.PlayerId}");
             continue;
         }
-
-        contract.Player = player.Single();
     }
 
     var years = entity.Contracts.Select(q => q.FromRound / 100).ToList();
@@ -49,29 +53,67 @@ public async static Task Run(string myQueueItem,
 
     foreach (var year in distinctYears)
     {
-        var clubSeason = new ClubSeason(year, entity);
+        var yearStats = new List<StorageStat>(500);
+
+        Stopwatch timer = new Stopwatch();
+        timer.Start();
+
+        for (int i = 0; i < 24; i++)
+        {
+            yearStats.AddRange(stats.Where(stat => stat.PartitionKey == $"{year}{i.ToString("00")}"));
+        }
+
+        var playerStats = yearStats.GroupBy(stat => stat.PlayerId).ToDictionary(q => q.Key, q => q.ToList());
+        timer.Stop();
+        _log.Info($"{year} Loaded stats in {timer.ElapsedMilliseconds} ms");
+
+        var clubSeason = new ClubSeason(year, entity, playerStats);
 
         var upsert = TableOperation.InsertOrReplace(clubSeason);
         tasks.Add(clubWriter.ExecuteAsync(upsert));
+
+        _log.Info($"Wrote {year}");
     }
 
-    await Task.WhenAll(tasks);
+    await Task.WhenAll(tasks );
 }
 
 private static TraceWriter _log;
 
 public class ClubSeason : ComplexEntity
 {
-    public ClubSeason() { }
+    public ClubSeason()
+    {
+    }
 
-    public ClubSeason(int year, Club club)
+    public ClubSeason(int year, Club club, IDictionary<Guid, List<StorageStat>> stats)
     {
         Id = club.Id;
         CoachName = club.CoachName;
         ClubName = club.ClubName;
         Email = club.Email;
         Year = year;
-        Contracts = club.Contracts.Where(q => q.FromRound <= int.Parse($"{year}24") && q.ToRound >= int.Parse($"{year}01")).ToList();
+        Contracts =
+            club.Contracts.Where(q => q.FromRound <= int.Parse($"{year}24") && q.ToRound >= int.Parse($"{year}01"))
+                .ToList();
+
+        foreach (var contract in Contracts)
+        {
+            if (!stats.ContainsKey(contract.PlayerId))
+            {
+                continue;
+            }
+
+            try
+            {
+                contract.Stats = stats[contract.PlayerId].Select(stat => (ReadStat)stat);
+            }
+            catch (Exception ex)
+            {
+                _log.Info($"Error casting StorageStat to ReadStat:\n{ex.ToString()}");
+                throw;
+            }
+        }
     }
 
     private string _clubName{get;set;}
@@ -213,11 +255,13 @@ public class Contract
         ToRound = toRound;
         DraftPick = draftPick;
     }
+
     public Guid PlayerId { get; set; }
     public int FromRound { get; set; }
     public int ToRound { get; set; }
     public int DraftPick { get; set; }
     public ReadPlayer Player { get; set; }
+    public IEnumerable<ReadStat> Stats { get; set; }
 }
 
 public class DdhpEvent : TableEntity
@@ -362,4 +406,76 @@ public abstract class ComplexEntity : TableEntity
 public class SerializeAttribute : Attribute
 {
 
+}
+
+public class StorageStat : TableEntity
+{
+    private Guid _playerId;
+    private int _round;
+
+    public Guid PlayerId
+    {
+        get { return _playerId; }
+        set
+        {
+            RowKey = value.ToString();
+            _playerId = value;
+        }
+    }
+
+    public int Round
+    {
+        get { return _round; }
+        set
+        {
+            PartitionKey = value.ToString();
+            _round = value;
+        }
+    }
+
+    public int Goals { get; set; }
+    public int Behinds { get; set; }
+    public int Disposals { get; set; }
+    public int Marks { get; set; }
+    public int Hitouts { get; set; }
+    public int Tackles { get; set; }
+    public int Kicks { get; set; }
+    public int Handballs { get; set; }
+    public int GoalAssists { get; set; }
+    // ReSharper disable once InconsistentNaming
+    public int Inside50s { get; set; }
+    public int FreesFor { get; set; }
+    public int FreesAgainst { get; set; }
+    // ReSharper disable once InconsistentNaming
+    public Guid AflClubId { get; set; }
+}
+
+public struct ReadStat
+{
+    [JsonProperty("rn")]
+    public int RoundNumber { get; set; }
+    [JsonProperty("f")]
+    public int Forward { get; set; }
+    [JsonProperty("m")]
+    public int Midfield { get; set; }
+    [JsonProperty("r")]
+    public int Ruck { get; set; }
+    [JsonProperty("t")]
+    public int Tackle { get; set; }
+
+    public static implicit operator ReadStat(StorageStat stat)
+    {
+        var f = stat.Goals*6 + stat.Behinds;
+        var m = stat.Disposals;
+        var r = stat.Hitouts + stat.Marks;
+        var t = stat.Tackles * 6;
+
+        return new ReadStat
+        {
+            Forward = f,
+            Midfield = m,
+            Ruck = r,
+            Tackle = t
+        };
+    }
 }
