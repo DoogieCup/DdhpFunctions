@@ -1,15 +1,15 @@
 ﻿#r "Newtonsoft.Json"
 #r "Microsoft.WindowsAzure.Storage"
-#r "ClubReadUpdater.Lib.dll"
+#r "ClubReadUpdaterLib.dll"
 using System;
 using ClubReadUpdater.Lib;
 
 public async static
 
 Task Run(string myQueueItem, 
-    IQueryable<DdhpEvent> clubEvents, 
-    IQueryable<Player> players,
-    IQueryable<StorageStat> stats,
+    IQueryable<ClubReadUpdater.Lib.DdhpEvent> clubEvents, 
+    IQueryable<ClubReadUpdater.Lib.Player> players,
+    IQueryable<ClubReadUpdater.Lib.StorageStat> stats,
     CloudTable clubWriter, 
     TraceWriter log)
 {

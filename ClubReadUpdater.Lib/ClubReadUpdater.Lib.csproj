@@ -8,7 +8,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>ClubReadUpdater.Lib</RootNamespace>
-    <AssemblyName>ClubReadUpdater.Lib</AssemblyName>
+    <AssemblyName>ClubReadUpdaterLib</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
@@ -68,8 +68,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Club.cs" />
+    <Compile Include="ClubCreatedEvent.cs" />
+    <Compile Include="ClubSeason.cs" />
+    <Compile Include="ComplexEntity.cs" />
+    <Compile Include="Contract.cs" />
+    <Compile Include="ContractImportedEvent.cs" />
+    <Compile Include="DdhpEvent.cs" />
+    <Compile Include="Player.cs" />
+    <Compile Include="ReadPlayer.cs" />
+    <Compile Include="ReadStat.cs" />
     <Compile Include="Runner.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SerializeAttribute.cs" />
+    <Compile Include="StorageStat.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

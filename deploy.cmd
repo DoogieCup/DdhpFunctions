@@ -54,10 +54,12 @@ IF NOT DEFINED KUDU_SYNC_CMD (
 
 echo Handling function App deployment.
 
-dotnet restore ClubReadUpdater.Lib
+nuget restore
+cd ClubReadUpdater.Lib
 dotnet build ClubReadUpdater.Lib
-if not exist bin\NUL mkdir bin
-xcopy ClubReadUpdater.Lib\Bin\Debug\*.dll bin\ /Y
+cd ..
+if not exist ClubReadUpdater\bin\NUL mkdir ClubReadUpdater\bin
+xcopy ClubReadUpdater.Lib\Bin\Debug\*.dll ClubReadUpdater\bin\ /Y
 
 :: 1. KuduSync
 IF /I "%IN_PLACE_DEPLOYMENT%" NEQ "1" (
