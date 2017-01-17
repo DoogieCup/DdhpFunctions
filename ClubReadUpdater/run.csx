@@ -3,6 +3,8 @@
 #r "ClubReadUpdaterLib.dll"
 using System;
 using ClubReadUpdater.Lib;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
 
 public async static
 
