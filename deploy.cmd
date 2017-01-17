@@ -57,7 +57,7 @@ echo Handling function App deployment.
 dotnet restore ClubReadUpdater.Lib
 dotnet build ClubReadUpdater.Lib
 if not exist ClubReadUpdater\bin\NUL mkdir ClubReadUpdater\bin
-copy ClubReadUpdater.Lib\Bin\Debug\ClubReadUpdater.Lib.dll ClubReadUpdater\bin
+xcopy ClubReadUpdater.Lib\Bin\Debug\*.dll ClubReadUpdater\bin\ /Y
 
 :: 1. KuduSync
 IF /I "%IN_PLACE_DEPLOYMENT%" NEQ "1" (
