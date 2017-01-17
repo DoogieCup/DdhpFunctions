@@ -1,7 +1,9 @@
 ﻿#r "Newtonsoft.Json"
 #r "Microsoft.WindowsAzure.Storage"
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
+using System.Reflection;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
@@ -25,9 +27,7 @@ public async static Task Run(string myQueueItem,
     var entity = Club.LoadFromEvents(clubEvents.Where(q => q.PartitionKey == id.ToString()));
     log.Info($"Club Name: {entity.ClubName} Id: {entity.Id}");
 
-    var contracts = entity._contracts;
-
-    foreach (var contract in contracts)
+    foreach (var contract in entity.Contracts)
     {
         var player = players.Where(q => q.Id == contract.PlayerId).ToList();
 
@@ -37,11 +37,11 @@ public async static Task Run(string myQueueItem,
             continue;
         }
 
-        contract.SetPlayer(player.Single());
+        contract.Player = player.Single();
     }
 
-    var years = entity.ContractsRead.Select(q => q.FromRound / 100).ToList();
-    years.AddRange(entity.ContractsRead.Select(q => q.ToRound / 100));
+    var years = entity.Contracts.Select(q => q.FromRound / 100).ToList();
+    years.AddRange(entity.Contracts.Select(q => q.ToRound / 100));
 
     var distinctYears = years.Distinct();
 
@@ -60,7 +60,7 @@ public async static Task Run(string myQueueItem,
 
 private static TraceWriter _log;
 
-public class ClubSeason : TableEntity
+public class ClubSeason : ComplexEntity
 {
     public ClubSeason() { }
 
@@ -71,7 +71,7 @@ public class ClubSeason : TableEntity
         ClubName = club.ClubName;
         Email = club.Email;
         Year = year;
-        _contracts = club.ContractsRead.Where(q => q.FromRound <= int.Parse($"{year}24") && q.ToRound >= int.Parse($"{year}01")).ToList();
+        Contracts = club.Contracts.Where(q => q.FromRound <= int.Parse($"{year}24") && q.ToRound >= int.Parse($"{year}01")).ToList();
     }
 
     private string _clubName{get;set;}
@@ -102,18 +102,13 @@ public class ClubSeason : TableEntity
         }
     }
 
-    public List<Contract> _contracts = new List<Contract>();
-
-    public string Contracts
-    {
-        get { return JsonConvert.SerializeObject(_contracts); }
-        set { _contracts = (List<Contract>)JsonConvert.DeserializeObject<List<Contract>>(value); }
-    }
+    [Serialize]
+    public IEnumerable<Contract> Contracts { get; set; }
 
     public int Version { get; set; }
 }
 
-public class Club : TableEntity
+public class Club : ComplexEntity
 {
     private Guid _id;
     public Guid Id
@@ -130,21 +125,19 @@ public class Club : TableEntity
     public string ClubName { get; set; }
     public string Email { get; set; }
 
-    public List<Contract> _contracts = new List<Contract>();
-
-    public IEnumerable<Contract> ContractsRead => _contracts;
-
     private Club()
     {
         Version = -1;
         PartitionKey = "ALL_CLUBS";
     }
 
-    public string Contracts
+    public IEnumerable<Contract> Contracts
     {
-        get { return JsonConvert.SerializeObject(_contracts); }
-        set { _contracts = (List<Contract>)JsonConvert.DeserializeObject<List<Contract>>(value); }
+        get { return _contracts; }
+        set { _contracts = value.ToList(); }
     }
+
+    private List<Contract> _contracts = new List<Contract>();
 
     public int Version { get; set; }
 
@@ -224,12 +217,7 @@ public class Contract
     public int FromRound { get; set; }
     public int ToRound { get; set; }
     public int DraftPick { get; set; }
-    public string Player { get; set; }
-
-    public void SetPlayer(Player player)
-    {
-        Player = JsonConvert.SerializeObject(player);
-    }
+    public ReadPlayer Player { get; set; }
 }
 
 public class DdhpEvent : TableEntity
@@ -303,4 +291,75 @@ public class Player : TableEntity
 
     [IgnoreProperty]
     public int LegacyId { get; set; }
+}
+
+public class ReadPlayer
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; }
+
+    public Guid CurrentAflClubId { get; set; }
+
+    public bool Active { get; set; }
+    public string FootywireName { get; set; }
+
+    public static implicit operator ReadPlayer(Player player)
+    {
+        return new ReadPlayer
+        {
+            Id = player.Id,
+            Name = player.Name,
+            CurrentAflClubId = player.CurrentAflClubId,
+            Active = player.Active,
+            FootywireName = player.FootywireName
+        };
+    }
+}
+
+public abstract class ComplexEntity : TableEntity
+{
+    public override void ReadEntity(IDictionary<string, EntityProperty> properties, OperationContext operationContext)
+    {
+        base.ReadEntity(properties, operationContext);
+
+        foreach (var property in SerializedProperties)
+        {
+            var value = properties[property.Name].StringValue;
+            Type propertyType = property.PropertyType;
+            property.SetValue(this, JsonConvert.DeserializeObject(value, propertyType));
+        }
+    }
+
+    public override IDictionary<string, EntityProperty> WriteEntity(OperationContext operationContext)
+    {
+        var dictionary = base.WriteEntity(operationContext);
+
+        foreach (var propertyInfo in SerializedProperties)
+        {
+            dictionary.Add(propertyInfo.Name, new EntityProperty(JsonConvert.SerializeObject(propertyInfo.GetValue(this))));
+        }
+
+        return dictionary;
+    }
+
+    private IEnumerable<PropertyInfo> SerializedProperties
+    {
+        get
+        {
+            foreach (var propertyInfo in GetType().GetProperties())
+            {
+                var serializeAttribute = propertyInfo.GetCustomAttribute<SerializeAttribute>();
+                if (serializeAttribute != null)
+                {
+                    yield return propertyInfo;
+                }
+            }
+        }
+    }
+}
+
+public class SerializeAttribute : Attribute
+{
+
 }
