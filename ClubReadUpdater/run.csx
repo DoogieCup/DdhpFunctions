@@ -1,6 +1,6 @@
 ﻿#r "Newtonsoft.Json"
 #r "Microsoft.WindowsAzure.Storage"
-#r "ClubReadUpdater.Lib"
+#r "ClubReadUpdater.Lib.dll"
 using System;
 using ClubReadUpdater.Lib;
 
