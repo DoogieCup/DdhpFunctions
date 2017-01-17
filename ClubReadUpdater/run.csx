@@ -42,6 +42,8 @@ Task Run(string myQueueItem,
             log.Info($"Cannot find player for id {contract.PlayerId}");
             continue;
         }
+
+        contract.Player = player.Single();
     }
 
     var years = entity.Contracts.Select(q => q.FromRound / 100).ToList();
