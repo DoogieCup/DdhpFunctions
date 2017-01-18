@@ -15,8 +15,6 @@ Task Run(string myQueueItem,
     CloudTable clubWriter, 
     TraceWriter log)
 {
-    _log =log;
-
     var runner = new Runner((message) => log.Info(message));
 
     await runner.Run(myQueueItem,
