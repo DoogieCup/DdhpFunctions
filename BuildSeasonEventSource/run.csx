@@ -67,9 +67,9 @@ private static async Task<int> ImportStats(Round round, int version)
     {
         var matchStats = new StatsSubmittedEvent
         {
-            RoundNumber = round.RoundNumber,
-            AflClubId = statGroup.Key,
-            Stats = statGroup.Select(q => (Stat)q)
+            round = round.RoundNumber,
+            aflClubId = statGroup.Key,
+            stats = statGroup.Select(q => (Stat)q)
         };
 
         var statEvent = new Event(round.Year,
@@ -237,9 +237,9 @@ private static int GetRoundNumber(int roundId)
 
 public class StatsSubmittedEvent
 {
-    public int RoundNumber{get;set;}
-    public Guid AflClubId{get;set;}
-    public IEnumerable<Stat> Stats{get;set;}
+    public int round{get;set;}
+    public Guid aflClubId{get;set;}
+    public IEnumerable<Stat> stats{get;set;}
 }
 
 public class TeamSubmittedEvent
