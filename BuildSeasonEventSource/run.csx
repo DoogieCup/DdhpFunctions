@@ -91,7 +91,7 @@ private static async Task SaveEvent(Event e)
     }
     catch (Exception ex)
     {
-        _logger.Info($"Error while saving event {e.PartitionKey} {e.RowKey}\n{e.Payload}\n{ex.ToString()}");
+        _logger.Info($"Error while saving event {e.PartitionKey} {e.RowKey}\n{e.payload}\n{ex.ToString()}");
         throw;
     }
 }
@@ -208,20 +208,20 @@ public class Event : TableEntity
     {
         RowKey = entityVersion.ToString("0000000000");
         PartitionKey = entityId.ToString();
-        EventType = eventType;
+        this.eventType = eventType;
         SetPayload(payload);
     }
 
-    public string EventType{get;set;}
-    public string Payload{get;set;}
+    public string eventType{get;set;}
+    public string payload{get;set;}
     public T GetPayload<T>()
     {
-        return (T)JsonConvert.DeserializeObject<T>(Payload);
+        return (T)JsonConvert.DeserializeObject<T>(payload);
     }
 
     public void SetPayload(object payload)
     {
-        Payload = JsonConvert.SerializeObject(payload);
+        this.payload = JsonConvert.SerializeObject(payload);
     }
 }
 
