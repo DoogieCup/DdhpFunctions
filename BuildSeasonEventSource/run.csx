@@ -30,7 +30,7 @@ public async static Task Run(string input,
     _stats = stats;
     _aflClubs = aflClubs;
 
-    int year = int.Parse(input);
+    int year = 2008;
     var currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
 
     var aflClubIds = aflClubs.Select(q => q.Id);
