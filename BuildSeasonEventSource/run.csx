@@ -139,7 +139,7 @@ private static async Task<int> AddTeam(Round round, int version, PickedTeam team
     {
         round = round.RoundNumber,
         clubId = team.ClubId,
-        Team = team
+        team = team
     };
 
     var pickedEvent = new Event(round.Year,
@@ -170,7 +170,7 @@ private static async Task<int> AddRound(int year, Round round, int version)
         var completeEvent = new Event(year,
             version++,
             "roundCompleted",
-            new RoundCompletedEvent{RoundNumber = round.RoundNumber});
+            new RoundCompletedEvent{round = round.RoundNumber});
 
         await SaveEvent(completeEvent);
     }
@@ -246,12 +246,12 @@ public class TeamSubmittedEvent
 {
     public int round{get;set;}
     public Guid clubId{get;set;}
-    public PickedTeam Team{get;set;}
+    public PickedTeam team{get;set;}
 }
 
 public class RoundCompletedEvent
 {
-    public int RoundNumber{get;set;}
+    public int round{get;set;}
 }
 
 public class FixtureAddedEvent
@@ -349,8 +349,10 @@ public class PickedTeam : TableEntity
 {
     private Guid _clubId;
     private int _round;
+    [JsonIgnore]
     public Guid Id { get; set; }
 
+    [JsonIgnore]
     public Guid ClubId
     {
         get { return _clubId; }
@@ -361,6 +363,7 @@ public class PickedTeam : TableEntity
         }
     }
 
+    [JsonIgnore]
     public int Round
     {
         get { return _round; }
@@ -371,12 +374,22 @@ public class PickedTeam : TableEntity
         }
     }
 
-    public IEnumerable<TeamPlayer> pickedPositions { get; set; }
+    [JsonIgnore]
+    public string TeamJson
+    {
+        get { return JsonConvert.SerializeObject(PickedPositions); }
+        set { PickedPositions = (IEnumerable<TeamPlayer>) JsonConvert.DeserializeObject<IEnumerable<TeamPlayer>>(value); }
+    }
+
+    [JsonProperty("pickedPositions")]
+    public IEnumerable<TeamPlayer> PickedPositions { get; set; }
 
     public class TeamPlayer
     {
-        public Guid playerId { get; set; }
-        public char position { get; set; }
+        [JsonProperty("playerId")]
+        public Guid PlayerId { get; set; }
+        [JsonProperty("position")]
+        public char PickedPosition { get; set; }
     }
 }
 
@@ -454,39 +467,50 @@ public class StorageStat : TableEntity
         }
     }
 
+    [JsonProperty("goals")]
     public int Goals { get; set; }
+    [JsonProperty("behinds")]
     public int Behinds { get; set; }
+    [JsonProperty("disposals")]
     public int Disposals { get; set; }
+    [JsonProperty("marks")]
     public int Marks { get; set; }
+    [JsonProperty("hitouts")]
     public int Hitouts { get; set; }
+    [JsonProperty("tackles")]
     public int Tackles { get; set; }
+    [JsonProperty("kicks")]
     public int Kicks { get; set; }
+    [JsonProperty("handballs")]
     public int Handballs { get; set; }
+    [JsonProperty("goalAssists")]
     public int GoalAssists { get; set; }
-    // ReSharper disable once InconsistentNaming
+    [JsonProperty("inside50s")]
     public int Inside50s { get; set; }
+    [JsonProperty("freesFor")]
     public int FreesFor { get; set; }
+    [JsonProperty("freesAgainst")]
     public int FreesAgainst { get; set; }
-    // ReSharper disable once InconsistentNaming
+    [JsonProperty("aflClubId")]
     public Guid AflClubId { get; set; }
 }
 
 public struct Stat
 {
-    public Guid PlayerId{get;set;}
-    public int Goals { get; set; }
-    public int Behinds { get; set; }
-    public int Disposals { get; set; }
-    public int Marks { get; set; }
-    public int Hitouts { get; set; }
-    public int Tackles { get; set; }
-    public int Kicks { get; set; }
-    public int Handballs { get; set; }
-    public int GoalAssists { get; set; }
-    public int Inside50s { get; set; }
-    public int FreesFor { get; set; }
-    public int FreesAgainst { get; set; }
-    public Guid AflClubId { get; set; }
+    public Guid playerId{get;set;}
+    public int goals { get; set; }
+    public int behinds { get; set; }
+    public int disposals { get; set; }
+    public int marks { get; set; }
+    public int hitouts { get; set; }
+    public int tackles { get; set; }
+    public int kicks { get; set; }
+    public int handballs { get; set; }
+    public int goalAssists { get; set; }
+    public int inside50s { get; set; }
+    public int freesFor { get; set; }
+    public int freesAgainst { get; set; }
+    public Guid aflClubId { get; set; }
 
     public static implicit operator Stat(string stat)
     {
