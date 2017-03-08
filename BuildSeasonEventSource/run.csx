@@ -30,7 +30,7 @@ public async static Task Run(string input,
     _stats = stats;
     _aflClubs = aflClubs;
 
-    int year = 2008;
+    int year = int.Parse(input);
     var currentRounds = rounds.Where(round => round.Year == year).ToList().OrderBy(round => round.Id);
 
     var aflClubIds = aflClubs.Select(q => q.Id);
@@ -100,9 +100,9 @@ public static async Task<int> AddFixture(Round round, Fixture fixture, int versi
 {
     var addition = new FixtureAddedEvent
     {
-        RoundNumber = GetRoundNumber(fixture.RoundId),
-        HomeClub = fixture.Home,
-        AwayClub = fixture.Away
+        round = GetRoundNumber(fixture.RoundId),
+        homeClubId = fixture.Home,
+        awayClubId = fixture.Away
     };
 
     var year = round.Year;
@@ -135,10 +135,10 @@ public static async Task<int> AddFixture(Round round, Fixture fixture, int versi
 
 private static async Task<int> AddTeam(Round round, int version, PickedTeam team)
 {
-    var teamEvent = new PickedTeamSubmittedEvent
+    var teamEvent = new TeamSubmittedEvent
     {
-        RoundNumber = round.RoundNumber,
-        ClubId = team.ClubId,
+        round = round.RoundNumber,
+        clubId = team.ClubId,
         Team = team
     };
 
@@ -155,8 +155,8 @@ private static async Task<int> AddTeam(Round round, int version, PickedTeam team
 private static async Task<int> AddRound(int year, Round round, int version)
 {
     var addition = new RoundAddedEvent{
-        Round = round.RoundNumber,
-        NormalRound = round.NormalRound
+        round = round.RoundNumber,
+        normalRound = round.NormalRound
     };
     var additionEvent = new Event(year, 
         version++, 
@@ -187,7 +187,7 @@ private static async Task CreateSeason(int year, int version)
 {
     var creation = new SeasonCreatedEvent
     {
-        Id = year
+        year = year
     };
 
     var creationEvent = new Event(year,
@@ -242,10 +242,10 @@ public class StatsSubmittedEvent
     public IEnumerable<Stat> Stats{get;set;}
 }
 
-public class PickedTeamSubmittedEvent
+public class TeamSubmittedEvent
 {
-    public int RoundNumber{get;set;}
-    public Guid ClubId{get;set;}
+    public int round{get;set;}
+    public Guid clubId{get;set;}
     public PickedTeam Team{get;set;}
 }
 
@@ -256,20 +256,20 @@ public class RoundCompletedEvent
 
 public class FixtureAddedEvent
 {
-    public int RoundNumber{get;set;}
-    public Guid HomeClub{get;set;}
-    public Guid AwayClub{get;set;}
+    public int round{get;set;}
+    public Guid homeClubId{get;set;}
+    public Guid awayClubId{get;set;}
 }
 
 public class RoundAddedEvent
 {
-    public int Round{get;set;}
-    public bool NormalRound{get;set;}
+    public int round{get;set;}
+    public bool normalRound{get;set;}
 }
 
 public class SeasonCreatedEvent
 {
-    public int Id{get;set;}
+    public int year{get;set;}
 }
 
 public class Round : TableEntity
@@ -371,19 +371,12 @@ public class PickedTeam : TableEntity
         }
     }
 
-    public string TeamJson
-    {
-        get { return JsonConvert.SerializeObject(Team); }
-        set { Team = (IEnumerable<TeamPlayer>) JsonConvert.DeserializeObject<IEnumerable<TeamPlayer>>(value); }
-    }
-
-    [IgnoreProperty]
-    public IEnumerable<TeamPlayer> Team { get; set; }
+    public IEnumerable<TeamPlayer> pickedPositions { get; set; }
 
     public class TeamPlayer
     {
-        public Guid PlayerId { get; set; }
-        public char PickedPosition { get; set; }
+        public Guid playerId { get; set; }
+        public char position { get; set; }
     }
 }
 
