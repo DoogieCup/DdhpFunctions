@@ -377,19 +377,43 @@ public class PickedTeam : TableEntity
     [JsonIgnore]
     public string TeamJson
     {
-        get { return JsonConvert.SerializeObject(PickedPositions); }
-        set { PickedPositions = (IEnumerable<TeamPlayer>) JsonConvert.DeserializeObject<IEnumerable<TeamPlayer>>(value); }
+        get { return JsonConvert.SerializeObject(PickedPositions.Select(q => (StorageTeamPlayer)q)); }
+        set { PickedPositions =((IEnumerable<StorageTeamPlayer>) JsonConvert.DeserializeObject<IEnumerable<StorageTeamPlayer>>(value)).Select(q => (TeamPlayer)q); }
     }
 
     [JsonProperty("pickedPositions")]
     public IEnumerable<TeamPlayer> PickedPositions { get; set; }
 
+    public class StorageTeamPlayer
+    {
+        public Guid PlayerId { get; set; }
+        public char PickedPosition { get; set; }
+
+        public static implicit operator StorageTeamPlayer(TeamPlayer player)
+        {
+            return new StorageTeamPlayer
+            {
+                PlayerId = player.PlayerId,
+                PickedPosition = player.PickedPosition
+            };
+        }
+    }
+
     public class TeamPlayer
     {
         [JsonProperty("playerId")]
         public Guid PlayerId { get; set; }
-        [JsonProperty("position")]
+        [JsonProperty("position")]    
         public char PickedPosition { get; set; }
+
+        public static implicit operator TeamPlayer(StorageTeamPlayer player)
+        {
+            return new TeamPlayer
+            {
+                PlayerId = player.PlayerId,
+                PickedPosition = player.PickedPosition
+            };
+        }
     }
 }
 
